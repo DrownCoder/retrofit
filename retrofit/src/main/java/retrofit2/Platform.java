@@ -98,6 +98,7 @@ class Platform {
     }
 
     static class MainThreadExecutor implements Executor {
+      //关键代码，callBack会回调会UI线程
       private final Handler handler = new Handler(Looper.getMainLooper());
 
       @Override public void execute(Runnable r) {

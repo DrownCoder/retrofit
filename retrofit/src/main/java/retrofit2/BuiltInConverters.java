@@ -18,6 +18,7 @@ package retrofit2;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
+
 import okhttp3.RequestBody;
 import okhttp3.ResponseBody;
 import retrofit2.http.Streaming;
@@ -27,11 +28,15 @@ final class BuiltInConverters extends Converter.Factory {
   public Converter<ResponseBody, ?> responseBodyConverter(Type type, Annotation[] annotations,
       Retrofit retrofit) {
     if (type == ResponseBody.class) {
+      //判断是二进制流的形式，还是字符的形式，返回不同的对象,如果是Streaming类型返回StreamingResponseBodyConverter
+      // 如果字符类型，返回BufferingResponseBodyConverter
       return Utils.isAnnotationPresent(annotations, Streaming.class)
           ? StreamingResponseBodyConverter.INSTANCE
           : BufferingResponseBodyConverter.INSTANCE;
     }
     if (type == Void.class) {
+      //如果是Void则由静态内部类VoidResponseBodyConverter来处理。
+      if (type == Void.class) {
       return VoidResponseBodyConverter.INSTANCE;
     }
     return null;
@@ -40,7 +45,9 @@ final class BuiltInConverters extends Converter.Factory {
   @Override
   public Converter<?, RequestBody> requestBodyConverter(Type type,
       Annotation[] parameterAnnotations, Annotation[] methodAnnotations, Retrofit retrofit) {
-    if (RequestBody.class.isAssignableFrom(Utils.getRawType(type))) {
+      //Class.isAssignableFrom()是用来判断一个类Class1和另一个类Class2是否相同或是另一个类的超类或接口。
+      //如果type的原始接口是RequestBody相同或者子类，实现了接口
+      if (RequestBody.class.isAssignableFrom(Utils.getRawType(type))) {
       return RequestBodyConverter.INSTANCE;
     }
     return null;
@@ -59,6 +66,7 @@ final class BuiltInConverters extends Converter.Factory {
     static final RequestBodyConverter INSTANCE = new RequestBodyConverter();
 
     @Override public RequestBody convert(RequestBody value) throws IOException {
+      //直接返回value
       return value;
     }
   }

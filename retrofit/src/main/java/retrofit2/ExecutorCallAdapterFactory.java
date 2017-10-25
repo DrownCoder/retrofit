@@ -55,12 +55,13 @@ final class ExecutorCallAdapterFactory extends CallAdapter.Factory {
       this.callbackExecutor = callbackExecutor;
       this.delegate = delegate;
     }
-
+    //对应执行的是OkHttpCall的enqueue方法，代理模式，静态代理
     @Override public void enqueue(final Callback<T> callback) {
       checkNotNull(callback, "callback == null");
 
       delegate.enqueue(new Callback<T>() {
         @Override public void onResponse(Call<T> call, final Response<T> response) {
+          //Platform中的UI线程回调
           callbackExecutor.execute(new Runnable() {
             @Override public void run() {
               if (delegate.isCanceled()) {

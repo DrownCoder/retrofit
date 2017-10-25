@@ -222,7 +222,7 @@ final class RequestBuilder {
         requestBuilder.addHeader("Content-Type", contentType.toString());
       }
     }
-
+    //其实是代理模式，实际上调用的是okHttp中的Request.Builder
     return requestBuilder
         .url(url)
         .method(method, body)

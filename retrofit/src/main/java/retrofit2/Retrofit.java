@@ -58,6 +58,7 @@ import static retrofit2.Utils.checkNotNull;
  * @author Jake Wharton (jw@squareup.com)
  */
 public final class Retrofit {
+  //线程安全
   private final Map<Method, ServiceMethod<?, ?>> serviceMethodCache = new ConcurrentHashMap<>();
 
   final okhttp3.Call.Factory callFactory;
@@ -130,6 +131,7 @@ public final class Retrofit {
     if (validateEagerly) {
       eagerlyValidateMethods(service);
     }
+    //动态代理
     return (T) Proxy.newProxyInstance(service.getClassLoader(), new Class<?>[] { service },
         new InvocationHandler() {
           private final Platform platform = Platform.get();
@@ -138,19 +140,30 @@ public final class Retrofit {
               throws Throwable {
             // If the method is a method from Object then defer to normal invocation.
             if (method.getDeclaringClass() == Object.class) {
+              //如果是从Object继承的方法，正常调用
               return method.invoke(this, args);
             }
+            //其他platform默认返回false,只有java8平台返回method.isDefault()返回
             if (platform.isDefaultMethod(method)) {
               return platform.invokeDefaultMethod(method, service, proxy, args);
             }
             ServiceMethod<Object, Object> serviceMethod =
                 (ServiceMethod<Object, Object>) loadServiceMethod(method);
+            //创建OkHttpCall
             OkHttpCall<Object> okHttpCall = new OkHttpCall<>(serviceMethod, args);
+            //返回的是ExecutorCallAdapterFactory的静态内部类ExecutorCallbackCall
             return serviceMethod.callAdapter.adapt(okHttpCall);
           }
         });
   }
 
+  /**
+   * 所以如果我们在Retrofit.Builder的validateEagerly参数被设置为true，
+   * 我们在create方法执行的时候，就会遍历这个service的所有方法，
+   * 由于platform.isDefaultMethod(method)在Android平台默认返回false，
+   * 所以一定会执行 loadServiceMethod(method)，也就是说如果设置validateEagerly=true,
+   * 则Retrofit会把这个service接口的所有方法都load进来，也就说一次性全部导入。
+   */
   private void eagerlyValidateMethods(Class<?> service) {
     Platform platform = Platform.get();
     for (Method method : service.getDeclaredMethods()) {
@@ -161,13 +174,15 @@ public final class Retrofit {
   }
 
   ServiceMethod<?, ?> loadServiceMethod(Method method) {
+    //缓存中是否存在，有则直接用缓存中的
     ServiceMethod<?, ?> result = serviceMethodCache.get(method);
     if (result != null) return result;
-
+    //并发的思想，有点像单例模式
     synchronized (serviceMethodCache) {
       result = serviceMethodCache.get(method);
       if (result == null) {
         result = new ServiceMethod.Builder<>(this, method).build();
+        //加入缓存
         serviceMethodCache.put(method, result);
       }
     }
@@ -218,6 +233,7 @@ public final class Retrofit {
 
     int start = adapterFactories.indexOf(skipPast) + 1;
     for (int i = start, count = adapterFactories.size(); i < count; i++) {
+      //默认的返回的是ExecutorCallAdapterFactory中重写的CallAdapter,adapte()方法返回的是ExecutorCallbackCall
       CallAdapter<?, ?> adapter = adapterFactories.get(i).get(returnType, annotations, this);
       if (adapter != null) {
         return adapter;
@@ -278,6 +294,7 @@ public final class Retrofit {
     int start = converterFactories.indexOf(skipPast) + 1;
     for (int i = start, count = converterFactories.size(); i < count; i++) {
       Converter.Factory factory = converterFactories.get(i);
+      //默认拿到的是BuiltInConverters
       Converter<?, RequestBody> converter =
           factory.requestBodyConverter(type, parameterAnnotations, methodAnnotations, this);
       if (converter != null) {
@@ -574,11 +591,13 @@ public final class Retrofit {
 
       okhttp3.Call.Factory callFactory = this.callFactory;
       if (callFactory == null) {
+        //默认的OkHttpClient
         callFactory = new OkHttpClient();
       }
 
       Executor callbackExecutor = this.callbackExecutor;
       if (callbackExecutor == null) {
+        //Android平台会利用Looper.getMainLooper()回调会UI线程
         callbackExecutor = platform.defaultCallbackExecutor();
       }
 

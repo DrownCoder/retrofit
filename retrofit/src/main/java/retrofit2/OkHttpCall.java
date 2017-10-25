@@ -56,6 +56,9 @@ final class OkHttpCall<T> implements Call<T> {
     if (call != null) {
       return call.request();
     }
+    //判断是不是存在异常,如果存在异常，则抛出异常,这里如果call为null表示只有两种可能：1.没有创建过，首次创建2.创建过，失败了。
+    //如果是1.createFailture肯定=null
+    //如果是2，则createFailture!=null,没必要再创建一遍，浪费。
     if (creationFailure != null) {
       if (creationFailure instanceof IOException) {
         throw new RuntimeException("Unable to create request.", creationFailure);
@@ -64,6 +67,7 @@ final class OkHttpCall<T> implements Call<T> {
       }
     }
     try {
+      //创建一个Okhttp中的call
       return (rawCall = createRawCall()).request();
     } catch (RuntimeException e) {
       creationFailure = e;
@@ -88,6 +92,7 @@ final class OkHttpCall<T> implements Call<T> {
       failure = creationFailure;
       if (call == null && failure == null) {
         try {
+          //创建OkHttp中的Call
           call = rawCall = createRawCall();
         } catch (Throwable t) {
           failure = creationFailure = t;
@@ -147,9 +152,10 @@ final class OkHttpCall<T> implements Call<T> {
     okhttp3.Call call;
 
     synchronized (this) {
+      //请求过了
       if (executed) throw new IllegalStateException("Already executed.");
       executed = true;
-
+      //如果之前创建过程中出现过异常，则没必要再创建一次
       if (creationFailure != null) {
         if (creationFailure instanceof IOException) {
           throw (IOException) creationFailure;
@@ -161,6 +167,7 @@ final class OkHttpCall<T> implements Call<T> {
       call = rawCall;
       if (call == null) {
         try {
+          //创建okhttp中的call
           call = rawCall = createRawCall();
         } catch (IOException | RuntimeException e) {
           creationFailure = e;
@@ -177,7 +184,9 @@ final class OkHttpCall<T> implements Call<T> {
   }
 
   private okhttp3.Call createRawCall() throws IOException {
+    //得到OkHttp中的Request
     Request request = serviceMethod.toRequest(args);
+    //默认callFactory = OkHttpClient,对应得到OkHttp中的Call
     okhttp3.Call call = serviceMethod.callFactory.newCall(request);
     if (call == null) {
       throw new NullPointerException("Call.Factory returned null.");
@@ -189,12 +198,14 @@ final class OkHttpCall<T> implements Call<T> {
     ResponseBody rawBody = rawResponse.body();
 
     // Remove the body's source (the only stateful object) so we can pass the response along.
+    //构造一个没有body的Resposne
     rawResponse = rawResponse.newBuilder()
         .body(new NoContentResponseBody(rawBody.contentType(), rawBody.contentLength()))
         .build();
 
     int code = rawResponse.code();
     if (code < 200 || code >= 300) {
+      //错误
       try {
         // Buffer the entire body to avoid future I/O.
         ResponseBody bufferedBody = Utils.buffer(rawBody);
@@ -205,12 +216,14 @@ final class OkHttpCall<T> implements Call<T> {
     }
 
     if (code == 204 || code == 205) {
+      //204和205返回一个没有body的Resposne
       rawBody.close();
       return Response.success(null, rawResponse);
     }
 
     ExceptionCatchingRequestBody catchingBody = new ExceptionCatchingRequestBody(rawBody);
     try {
+      //默认是BuiltInConverters中的BufferingResponseBodyConverter来进行缓冲流转换
       T body = serviceMethod.toResponse(catchingBody);
       return Response.success(body, rawResponse);
     } catch (RuntimeException e) {

@@ -24,6 +24,9 @@ import okhttp3.MultipartBody;
 import okhttp3.RequestBody;
 
 import static retrofit2.Utils.checkNotNull;
+//其实Retrofit团队是这样分工的，RequestBuilder仅仅是一个包装类，
+// 但是具体的赋值操作等其实是通过ParameterHandler对应的静态内部类来实现的，
+// 这样实现了包装和操作分离，实现了解耦。多么"优雅"的设计。
 
 abstract class ParameterHandler<T> {
   abstract void apply(RequestBuilder builder, @Nullable T value) throws IOException;
